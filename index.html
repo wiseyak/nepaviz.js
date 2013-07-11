@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+<title>VDC/Municipality Level Cluster and Choropleth Map</title>
+<link rel="stylesheet" type="text/css" href="css/nepaviz.css" />
+<link rel="stylesheet" type="text/css" href="css/colorbrewer.css" />
+<link href="css/nv.d3.css" rel="stylesheet" type="text/css">
+<script src="js/d3.v3.min.js"></script>
+<script src="js/topojson.v1.min.js"></script>
+<script src="js/nepaviz.js"></script>
+<script src="js/nv.d3.min.js"></script>
+</head>
+<body><div>
+<input type="text" id="query"/><button type="button" id="search">Search</button>
+</div>
+<script>
+	nepaviz.init(960, 600, "body", "json/nepal.json");
+	nepaviz.data("json/literacy.json");
+	nepaviz.setTitle("Base Map VDC Level");
+	nepaviz.choroplethLevel("vdc", "literacy", 6);
+	//nepaviz.choroplethUnit("district", "020127", "literacy", 6);
+	
+	
+	d3.selectAll("#search").on("click", function(d) {
+		var query = document.getElementById("query").value;
+		nepaviz.search("vdc", [query]);
+	});
+</script>
+<div id="barChart">
+    <svg></svg>
+</div>
+<div id="pieChart">
+    <svg></svg>
+</div>
+<div id="multiBarChart">
+    <svg></svg>
+</div>
+</body>
+</html>

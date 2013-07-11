@@ -1,0 +1,206 @@
+body {
+}
+
+#map {
+	fill: white;
+	font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+	font-size: 12px;
+	border: 1px solid #ccc;
+	background: #eee;
+}
+
+#menu {
+  position: absolute;       
+  text-align: left;
+  border: 1px solid #ccc;                
+  padding: 4px;             
+  font: 12px sans-serif;        
+  background: #eee;
+  width: 1167px;
+  height: 28px;
+}
+
+.country-boundary {
+  fill: none;
+  stroke: #000;
+  stroke-width: 1px;
+  stroke-linejoin: round;
+}
+
+.region {
+  stroke: #000;
+  stroke-width: 0.1px;
+  stroke-linejoin: round;
+}
+
+.region-boundary {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1px;
+  stroke-linejoin: round;
+}
+
+.region-label {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 10px;
+  text-anchor: middle;
+}
+
+.zone {
+  stroke: #000;
+  stroke-width: 0.75px;
+  stroke-linejoin: round;
+}
+
+.zone-boundary {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 0.5px;
+  stroke-linejoin: round;
+}
+
+.zone-label {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 10px;
+  text-anchor: middle;
+}
+
+.district {
+  stroke: #000;
+  stroke-width: 0.25px;
+  stroke-linejoin: round;
+}
+
+.district-boundary {
+  fill: none;
+  stroke: #fff;
+  stroke-width: .5px;
+}
+
+.district-label {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 10px;
+  text-anchor: middle;
+}
+
+.vdc {
+  stroke: #000;
+  stroke-width: 0.10px;
+  stroke-linejoin: round;
+}
+
+.active {
+	fill: red;
+	opacity: 0.5;
+}
+
+.tooltip {
+  position: absolute;       
+  text-align: left;
+  border: 1px solid black;                
+  padding: 4px;             
+  font: 12px sans-serif;        
+  background: white;    
+  border-radius: 4px;           
+  pointer-events: none;         
+}
+
+.sideinfo {   
+  position: absolute;           
+  text-align: left;               
+  padding: 4px;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  background: #eee;       
+  pointer-events: none;
+  top:5px;
+  left:975px;
+  width: 200px;
+  height: 592px;
+  z-index: -1;
+}
+
+.legend {
+  fill: #fff;
+  stroke: #000;
+  stroke-width: 1px;
+	opacity: 0.8;
+}
+
+.legend-rect {
+	stroke-width:0.5px;
+	stroke:#ccc;
+}
+
+.legend-title {
+	fill: black;
+	font-weight: bold;
+}
+
+.title {   
+	fill: black;        
+    text-anchor: middle;
+	font-size: 20px;
+	font-weight: bold;
+}
+
+.levelMenu {
+}
+
+.symbol {
+ fill: darkred;
+ fill-opacity: .75;
+ stroke: #fff;
+ display: inline;
+}
+
+.boundary {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1.5px;
+  stroke-linejoin: round;
+}
+
+.cluster-1 {fill:rgb(230,85,13)}
+
+.cluster-2 {fill:rgb(253,174,107)}
+
+.cluster-3 {fill:rgb(254,230,206)}
+
+ 
+.circle {
+  fill: red;
+}
+
+text {
+
+	fill: black;}
+	
+#description { 
+  position: absolute;           
+  text-align: left;               
+  padding: 4px;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  background: #eee;       
+  pointer-events: none;
+  top:655px;
+  width: 1167px;
+}
+
+#barChart {
+  width: 960px;
+  height: 600px;
+}
+
+#multiBarChart {
+  width: 960px;
+  height: 600px;
+}
+
+#pieChart {
+  width: 960px;
+  height: 600px;
+}

@@ -1,0 +1,958 @@
+/*global d3, topojson, console*/
+var nepaviz = (function() {
+    'use strict';
+
+    var width,
+        height,
+        data,
+        jsonData,
+        nepal,
+        nepalJson,
+        regionFeatures,
+        regionBoundaries,
+        zoneFeatures,
+        zoneBoundaries,
+        districtFeatures,
+        districtBoundaries,
+        vdcFeatures,
+        //vdcBoundaries,
+        //wardFeatures,
+        //wardBoundaries,
+        svg,
+        svgTitle,
+        projection = d3.geo.mercator(),
+        path = d3.geo.path()
+            .projection(projection),
+		multiBarChartData = [];
+
+    function addTitle() {
+        var title = svg.append("g")
+            .attr("class", "title");
+
+        title.append("text")
+            .attr("x", width / 2)
+            .attr("y", 40)
+            .attr("class", "title")
+            .text(svgTitle);
+    }
+
+    function addLegend(max, min, quantile, range) {
+        var legend = svg.append("g"),
+            quantiles = quantile.quantiles().reverse(),
+            y;
+
+        quantiles.forEach(function(d, i) {
+            y = height - 40 - i * 25 - 15;
+            quantiles[i] = Math.round(d);
+        });
+
+        legend.append("rect")
+            .attr("x", 20)
+            .attr("y", y - 50)
+            .attr("rx", 4)
+            .attr("ry", 4)
+            .attr("height", height - y + 40)
+            .attr("width", 100)
+            .attr("class", "legend");
+
+        legend.selectAll('g').data(quantile.range().reverse())
+            .enter()
+            .append('g')
+            .each(function(d, i) {
+                var g = d3.select(this);
+                y = height - 15 - i * 25 - 15;
+
+                g.append("rect")
+                    .attr("x", 30)
+                    .attr("y", height - 45 - i * 25)
+                    .attr("width", 20)
+                    .attr("height", 20)
+                    .attr("class", "legend-rect q" + d + "-" + range);
+
+                g.append("text")
+                    .attr("x", 60)
+                    .attr("y", y)
+                    .attr("height", 30)
+                    .attr("width", 100)
+                    .text((i === 0) ? quantiles[i] + " - " + Math.round(max) : ((i === range - 1) ? Math.round(min) + " - " + quantiles[i - 1] : quantiles[i] + " - " + quantiles[i - 1]));
+            });
+
+        legend.append("text")
+            .attr("x", 30)
+            .attr("y", y - 25)
+            .attr("height", 30)
+            .attr("width", 100)
+            .attr("class", "legend-title")
+            .text("Legend");
+    }
+
+    function clusterLegend(n) {
+        var legend = svg.append("g"),
+            ids = [],
+            y;
+
+        for (var i = 1; i <= n; i++) {
+            y = height - 40 - i - 1 * 25 - 15;
+            ids.push(i);
+        }
+
+        legend.append("rect")
+            .attr("x", 20)
+            .attr("y", y - 50)
+            .attr("rx", 4)
+            .attr("ry", 4)
+            .attr("height", height - y + 40)
+            .attr("width", 100)
+            .attr("class", "legend");
+
+        legend.selectAll('g').data(ids)
+            .enter()
+            .append('g')
+            .each(function(d, i) {
+                var g = d3.select(this);
+                y = height - 15 - i * 25 - 15;
+
+                g.append("rect")
+                    .attr("x", 30)
+                    .attr("y", height - 45 - i * 25)
+                    .attr("width", 20)
+                    .attr("height", 20)
+                    .attr("class", "cluster-" + d);
+
+                g.append("text")
+                    .attr("x", 60)
+                    .attr("y", y)
+                    .attr("height", 30)
+                    .attr("width", 100)
+                    .text("Cluster " + d);
+            });
+
+        legend.append("text")
+            .attr("x", 30)
+            .attr("y", y - 25)
+            .attr("height", 30)
+            .attr("width", 100)
+            .attr("class", "legend-title")
+            .text("Legend");
+    }
+
+    return {
+        //initialize width, height of svg, and administrative region features
+        init: function(w, h, container, jsonPath) {
+            width = w;
+            height = h;
+            nepal = function(onComplete) {
+                d3.json(jsonPath, function(npl) {
+                    nepalJson = npl;
+                    regionFeatures = topojson.feature(npl, npl.objects.regions);
+                    districtFeatures = topojson.feature(npl, npl.objects.districts);
+                    zoneFeatures = topojson.feature(npl, npl.objects.zones);
+                    vdcFeatures = topojson.feature(npl, npl.objects.vdcs);
+                    //wardFeatures = topojson.feature(npl, npl.objects.wards);
+
+                    regionBoundaries = topojson.mesh(npl, npl.objects.regions, function(a, b) { return a !== b; });
+                    zoneBoundaries = topojson.mesh(npl, npl.objects.zones, function(a, b) { return a !== b; });
+                    districtBoundaries = topojson.mesh(npl, npl.objects.districts, function(a, b) { return a !== b; });
+                    //vdcBoundaries = topojson.mesh(npl, npl.objects.vdcs, function(a, b) { return a !== b; });
+                    //wardBoundaries = topojson.mesh(npl, npl.objects.wards, function(a, b) { return a !== b; });
+                    onComplete();
+                });
+            };
+
+            svg = d3.select(container).append("svg")
+                .attr("width", width)
+                .attr("height", height)
+                .attr("class", "Greens")
+				.attr("id", "map");
+        },
+
+        //initialize width, height of svg, and administrative region features
+        data: function(dataPath) {
+            data  = function(onComplete) {
+                d3.json(dataPath, function(json) {
+                    jsonData = json;
+                    onComplete();
+                });
+            };
+        },
+
+        //set title of the svg
+        setTitle: function(title) {
+            svgTitle = title;
+        },
+
+        //display chloropleth in different administrative levels
+        choroplethLevel: function(level, field, range) {
+            var layer,
+                type,
+                bounds,
+                scale,
+                translation;
+
+            //unit projection
+            projection
+                .scale(1)
+                .translate([0, 0]);
+
+            nepal(function() {
+
+                function getParentNames(id) {
+                    var length = id.length,
+                        parentNames = [],
+                        //vdc,
+                        district,
+                        zone,
+                        region;
+
+                    switch (length) {
+
+                    case 9:
+                        district = districtFeatures.features.filter(function(d) { return d.id === id.substring(0, 6); })[0].properties.name;
+                        zone = zoneFeatures.features.filter(function(d) { return d.id === id.substring(0, 4); })[0].properties.name;
+                        region = regionFeatures.features.filter(function(d) { return d.id === id.substring(0, 2); })[0].properties.name;
+                        parentNames.push(district);
+                        parentNames.push(zone);
+                        parentNames.push(region);
+                        break;
+
+                    case 6:
+                        zone = zoneFeatures.features.filter(function(d) { return d.id === id.substring(0, 4); })[0].properties.name;
+                        region = regionFeatures.features.filter(function(d) { return d.id === id.substring(0, 2); })[0].properties.name;
+                        parentNames.push(zone);
+                        parentNames.push(region);
+                        break;
+
+                    case 4:
+                        region = regionFeatures.features.filter(function(d) { return d.id === id.substring(0, 2); })[0].properties.name;
+                        parentNames.push(region);
+                        break;
+
+                    case 2:
+                        break;
+                    }
+
+                    return parentNames;
+                }
+
+                projection
+                    .scale(1)
+                    .translate([0, 0]);
+
+                switch (level) {
+
+                case "region":
+                    layer = regionFeatures;
+                    type = "region";
+                    break;
+
+                case "zone":
+                    layer = zoneFeatures;
+                    type = "zone";
+                    break;
+
+                case "district":
+                    layer = districtFeatures;
+                    type = "district";
+                    break;
+
+                case "vdc":
+                    layer = vdcFeatures;
+                    type = "vdc";
+                    break;
+
+                /*case "ward":
+                    layer = wardFeatures;
+                    type = "ward";
+                    break;*/
+
+                default:
+                    console.log("Valid types: region, zone, district, vdc and ward");
+                    break;
+                }
+
+                bounds = path.bounds(layer);
+                scale = 0.95 / Math.max((bounds[1][0] - bounds[0][0]) / width, (bounds[1][1] - bounds[0][1]) / height);
+                translation = [(width - scale * (bounds[1][0] + bounds[0][0])) / 2, (height - scale * (bounds[1][1] + bounds[0][1])) / 2];
+
+                //modified projection
+                projection
+                    .scale(scale)
+                    .translate(translation);
+
+                var g,
+                    zoom,
+                    div,
+                    sideinfo;
+
+                g = svg.append("g")
+                    .attr("class", type);
+
+                function zoommove() {
+                    g.selectAll("path")
+                        .attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+                }
+
+                zoom = d3.behavior.zoom()
+                    .scaleExtent([1, 24])
+                    .on("zoom", zoommove);
+
+                g.call(zoom);
+
+                div = d3.select("body").append("div")
+                    .attr("class", "tooltip")
+                    .style("opacity", 0);
+                                
+                sideinfo = d3.select("body").append("div")
+                    .attr("class", "sideinfo")
+                    .html("<p>Hover over a region</p>");
+
+                data(function() {
+                    var dataById = {},
+                        min,
+                        max,
+                        quantile;
+
+                    jsonData = jsonData.filter(function(d) { return d.type === type; })[0].contents;
+
+                    jsonData.forEach(function(d) {
+                        dataById[d.id] = +d.properties[field];
+                    });
+
+                    max = d3.max(d3.values(dataById));
+                    min = d3.min(d3.values(dataById));
+                    quantile = d3.scale.quantile().domain([min, max]).range(d3.range(range));
+
+                    //add layers
+                    g.selectAll("." + type)
+                        .data(layer.features)
+                        .enter().append("path")
+                        .attr("class", function(d) { return type + " id" + d.id + " q" + quantile(dataById[d.id]) + "-" + range; })
+                        .attr("d", path)
+                        .on("mouseover", function(d) {
+                            d3.select(this)
+                                .style("fill", "red")
+                                .classed("active", true);
+                            div.data(jsonData.filter(function(a) { return a.id === d.id; }))
+                                .transition()
+                                .duration(200)
+                                .style("opacity", 0.9);
+                            
+                            div.html(function(a) {
+                                var keys = d3.keys(a.properties),
+                                    values = d3.values(a.properties),
+                                    parentNames = getParentNames(d.id),
+                                    info;
+
+                                info = "<p><b>" + d.properties.name + "</b><br/>";
+                                parentNames.forEach(function(a) { info += a + ", "; });
+                                info = info.slice(0, -2);
+                                info += "</p><hr/><table>";
+                                keys.forEach(function(a, i) { if(a === field) {
+										info += "<tr><td><b>" + a + "</b></td><td>" + "<b>" + values[i] + "</b></td></tr>";
+									}
+								});
+                                info += "</table>";
+
+                                return info;
+                            })
+                                .style("left", (d3.event.pageX) + "px")
+                                .style("top", (d3.event.pageY) + "px")
+                            sideinfo.data(jsonData.filter(function(a) { return a.id === d.id; }))
+                                .transition()
+                                .duration(200);
+                            sideinfo.html(function(a) {
+                                var keys = d3.keys(a.properties),
+                                    values = d3.values(a.properties),
+                                    parentNames = getParentNames(d.id),
+                                    info;
+
+                                    info = "<p><b>" + d.properties.name + "</b><br/>";
+                                    parentNames.forEach(function(a) { info += a + ", "; });
+                                    info = info.slice(0, -2);
+                                    info += "</p><hr/><table>";
+                                    keys.forEach(function(a, i) { info += "<tr><td>" + a  + "</td><td>" + values[i] + "</td></tr>"; });
+                                    info += "</table>";
+
+                                    return info;
+                            });
+                        })
+                        .on("mouseout", function() {
+                            d3.select(this)
+                                .style("fill", null)
+                                .classed("active", false);
+                            div.transition()
+                                .duration(100)
+                                .style("opacity", 0);
+                            d3.selectAll(".sideinfo").remove();
+                            sideinfo = d3.select("body").append("div")
+                                .attr("class", "sideinfo")
+                                .html("<p>Hover over a region</p>");
+                        })
+                        .on("click", function(d) {
+                            if (d3.event.shiftKey) {
+                                var unitData;
+
+                                unitData = jsonData.filter(function(a) { return a.id === d.id; })[0].properties;
+								var keys = d3.keys(unitData);
+								var values = d3.values(unitData);
+								var data = [];
+								for (var i = 0; i < keys.length; i++) {
+									data.push({label: keys[i], value: values[i]});
+								}
+								var pieData = [];
+								for (var i = 0; i < keys.length; i++) {
+									pieData.push({key: keys[i], y: values[i]});
+								}
+								var barData = [];
+								barData.push({key: "Chart", values: data});
+								//console.log(barData);
+                                nepaviz.barChart(barData);
+                                nepaviz.pieChart(pieData);
+                            }
+							
+							if (d3.event.ctrlKey) {
+								var unitData;
+
+                                unitData = jsonData.filter(function(a) { return a.id === d.id; })[0].properties;
+								var keys = d3.keys(unitData);
+								var values = d3.values(unitData);
+								var data = [];
+								for (var i = 0; i < keys.length; i++) {
+									data.push({series: 0, x: keys[i], y: values[i]});
+								}
+								
+								multiBarChartData.push({key: d.properties.name, values: data});
+								nepaviz.multiBarChart(multiBarChartData);
+                            }
+                        });
+
+                    //add boundaries
+                    if (level === "zone" || level === "district" || level === "vdc") {
+                        //add region boundaries
+                        g.append("path")
+                            .datum(regionBoundaries)
+                            .attr("class", "region-boundary")
+                            .attr("d", path);
+                    }
+
+                    if (level === "district" || level === "vdc") {
+                        //add zone boundaries
+                        g.append("path")
+                            .datum(zoneBoundaries)
+                            .attr("class", "zone-boundary")
+                            .attr("d", path);
+                    }
+
+                    if (level === "vdc") {
+                        //add district boundaries
+                        g.append("path")
+                            .datum(districtBoundaries)
+                            .attr("class", "district-boundary")
+                            .attr("d", path);
+                    }
+
+                    //title
+                    addTitle();
+
+                    //add legend
+                    addLegend(max, min, quantile, range);
+                });
+            });
+        },
+
+        //display chloropleth in a selected feature unit
+        choroplethUnit: function(type, id, field, range) {
+            var unit,
+                unitChildren,
+                childType,
+                to,
+                bounds,
+                scale,
+                translation;
+
+            //unit projection
+            projection
+                .scale(1)
+                .translate([0, 0]);
+
+            nepal(function() {
+                projection
+                    .scale(1)
+                    .translate([0, 0]);
+
+                switch (type) {
+
+                case "region":
+                    unit = regionFeatures.features.filter(function(d) { return d.id === id; })[0];
+                    childType = "zone";
+                    to = 2;
+                    unitChildren = topojson.feature(nepalJson,  {type: "GeometryCollection", geometries: nepalJson.objects.zones.geometries.filter(function(d) { return d.id.substring(0, to) === id; })});
+                    break;
+
+                case "zone":
+                    unit = zoneFeatures.features.filter(function(d) { return d.id === id; })[0];
+                    childType = "district";
+                    to = 4;
+                    unitChildren = topojson.feature(nepalJson,  {type: "GeometryCollection", geometries: nepalJson.objects.districts.geometries.filter(function(d) { return d.id.substring(0, to) === id; })});
+                    break;
+
+                case "district":
+                    unit = districtFeatures.features.filter(function(d) { return d.id === id; })[0];
+                    childType = "vdc";
+                    to = 6;
+                    unitChildren = topojson.feature(nepalJson,  {type: "GeometryCollection", geometries: nepalJson.objects.vdcs.geometries.filter(function(d) { return d.id.substring(0, to) === id; })});
+                    break;
+
+                /*case "vdc":
+                    unit = vdcFeatures.features.filter(function(d) { return d.id === id; })[0];
+                    childType = "ward";
+                    unitChildren = topojson.feature(nepalJson,  {type: "GeometryCollection", geometries: nepalJson.objects.wards.geometries.filter(function(d) { return d.id.substring(0, 9) === id; })});
+                    break;*/
+
+                default:
+                    console.log("Valid types: region, zone, district and vdc");
+                    break;
+                }
+
+                bounds = path.bounds(unit);
+                scale = 0.95 / Math.max((bounds[1][0] - bounds[0][0]) / width, (bounds[1][1] - bounds[0][1]) / height);
+                translation = [(width - scale * (bounds[1][0] + bounds[0][0])) / 2, (height - scale * (bounds[1][1] + bounds[0][1])) / 2];
+
+                //modified projection
+                projection
+                    .scale(scale)
+                    .translate(translation);
+
+                var g,
+                    zoom,
+                    div;
+
+                g = svg.append("g")
+                    .attr("class", type);
+
+                function zoommove() {
+                    g.selectAll("path")
+                        .attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+                }
+
+                zoom = d3.behavior.zoom()
+                    .scaleExtent([1, 12])
+                    .on("zoom", zoommove);
+
+                g.call(zoom);
+
+                div = d3.select("body").append("div")
+                    .attr("class", "tooltip")
+                    .style("opacity", 0);
+
+                data(function() {
+                    var dataById = {},
+                        min,
+                        max,
+                        quantile;
+
+                    jsonData = jsonData.filter(function(d) { return d.type === childType; })[0].contents;
+                    jsonData = jsonData.filter(function(d) { return d.id.toString().substring(0, to) === id; });
+
+                    jsonData.forEach(function(d) {
+                        dataById[d.id] = +d.properties[field];
+                    });
+
+                    max = d3.max(d3.values(dataById));
+                    min = d3.min(d3.values(dataById));
+                    quantile = d3.scale.quantile().domain([min, max]).range(d3.range(range));
+
+                    //add layers
+                    g.selectAll("." + type)
+                        .data(unitChildren.features)
+                        .enter().append("path")
+                        .attr("class", function(d) { return childType + " id" + d.id + " q" + quantile(dataById[d.id]) + "-" + range; })
+                        .attr("d", path)
+                        .on("mouseover", function(d) {
+                            d3.select(this)
+                                .classed("active", true);
+                            div.data(jsonData.filter(function(a) { return a.id === d.id; }))
+                                .transition()
+                                .duration(200)
+                                .style("opacity", 0.9);
+                            div.html(function(a) {
+                                var keys = d3.keys(a.properties),
+                                    values = d3.values(a.properties),
+                                    info;
+
+                                info = "<p><b>" + d.properties.name + "</b></p><hr/><table>";
+                                keys.forEach(function(a, i) { info += "<tr><td>" + a + "</td><td>" + values[i] + "</td></tr>"; });
+                                info += "</table>";
+
+                                return info;
+                            })
+                                .style("left", (d3.event.pageX) + "px")
+                                .style("top", (d3.event.pageY) + "px");
+                        })
+                        .on("mouseout", function() {
+                            d3.select(this)
+                                .classed("active", false);
+                            div.transition()
+                                .duration(100)
+                                .style("opacity", 0);
+                        });
+
+                    //title
+                    addTitle();
+
+                    //legend
+                    addLegend(max, min, quantile, range);
+                });
+            });
+        },
+
+        //display cluster in different administrative levels
+        cluster: function(level, clusterDataPath, dataPath) {
+            var layer,
+                type,
+                bounds,
+                scale,
+                translation;
+
+            //unit projection
+            projection
+                .scale(1)
+                .translate([0, 0]);
+
+            nepal(function() {
+
+                function getParentNames(id) {
+                    var length = id.length,
+                        parentNames = [],
+                        //vdc,
+                        district,
+                        zone,
+                        region;
+
+                    switch (length) {
+
+                    case 9:
+                        district = districtFeatures.features.filter(function(d) { return d.id === id.substring(0, 6); })[0].properties.name;
+                        zone = zoneFeatures.features.filter(function(d) { return d.id === id.substring(0, 4); })[0].properties.name;
+                        region = regionFeatures.features.filter(function(d) { return d.id === id.substring(0, 2); })[0].properties.name;
+                        parentNames.push(district);
+                        parentNames.push(zone);
+                        parentNames.push(region);
+                        break;
+
+                    case 6:
+                        zone = zoneFeatures.features.filter(function(d) { return d.id === id.substring(0, 4); })[0].properties.name;
+                        region = regionFeatures.features.filter(function(d) { return d.id === id.substring(0, 2); })[0].properties.name;
+                        parentNames.push(zone);
+                        parentNames.push(region);
+                        break;
+
+                    case 4:
+                        region = regionFeatures.features.filter(function(d) { return d.id === id.substring(0, 2); })[0].properties.name;
+                        parentNames.push(region);
+                        break;
+
+                    case 2:
+                        break;
+                    }
+
+                    return parentNames;
+                }
+
+                projection
+                    .scale(1)
+                    .translate([0, 0]);
+
+                switch (level) {
+
+                case "region":
+                    layer = regionFeatures;
+                    type = "region";
+                    break;
+
+                case "zone":
+                    layer = zoneFeatures;
+                    type = "zone";
+                    break;
+
+                case "district":
+                    layer = districtFeatures;
+                    type = "district";
+                    break;
+
+                case "vdc":
+                    layer = vdcFeatures;
+                    type = "vdc";
+                    break;
+
+                /*case "ward":
+                    layer = wardFeatures;
+                    type = "ward";
+                    break;*/
+
+                default:
+                    console.log("Valid types: region, zone, district, vdc and ward");
+                    break;
+                }
+
+                bounds = path.bounds(layer);
+                scale = 0.95 / Math.max((bounds[1][0] - bounds[0][0]) / width, (bounds[1][1] - bounds[0][1]) / height);
+                translation = [(width - scale * (bounds[1][0] + bounds[0][0])) / 2, (height - scale * (bounds[1][1] + bounds[0][1])) / 2];
+
+                //modified projection
+                projection
+                    .scale(scale)
+                    .translate(translation);
+
+                var g,
+                    zoom,
+                    div,
+                    sideinfo;
+
+                g = svg.append("g")
+                    .attr("class", type);
+
+                function zoommove() {
+                    g.selectAll("path")
+                        .attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+                }
+
+                zoom = d3.behavior.zoom()
+                    .scaleExtent([1, 24])
+                    .on("zoom", zoommove);
+
+                g.call(zoom);
+
+                div = d3.select("body").append("div")
+                    .attr("class", "tooltip")
+                    .style("opacity", 0);
+
+                sideinfo = d3.select("body").append("div")
+                    .attr("class", "sideinfo")
+                    .html("<p>Hover over a region</p>");
+
+                d3.json(clusterDataPath, function(jsonData) {
+                    d3.json(dataPath, function(houseHold) {
+                            var dataById = {};
+
+                            jsonData.forEach(function(d) {
+                                dataById[d.id] = +d.clusterid;
+                            });
+
+                            //add layers
+                            g.selectAll("." + type)
+                                .data(layer.features)
+                                .enter().append("path")
+                                .attr("class", function(d) { return "cluster-" + dataById[d.id]; })
+                                .attr("d", path)
+                                .on("mouseover", function(d) {
+                                    d3.select(this)
+                                        .style("fill", "red")
+                                        .classed("active", true);
+                                    div.data(jsonData.filter(function(a) { return a.id === d.id; }))
+                                        .transition()
+                                        .duration(200)
+                                        .style("opacity", 0.9);
+                                    div.html(function(a) {
+                                        var keys = d3.keys(a),
+                                            values = d3.values(a),
+                                            parentNames = getParentNames(d.id),
+                                            info;
+
+                                        info = "<p><b>" + d.properties.name + "</b><br/>";
+                                        parentNames.forEach(function(a) { info += a + ", "; });
+                                        info = info.slice(0, -2);
+                                        info += "</p><hr/><table>";
+                                        keys.forEach(function(a, i) { info += "<tr><td>" + a  + "</td><td>" + values[i] + "</td></tr>"; });
+                                        info += "</table>";
+
+                                        return info;
+                                    })
+                                        .style("left", (d3.event.pageX) + "px")
+                                        .style("top", (d3.event.pageY) + "px");
+                                    sideinfo.data(houseHold.filter(function(a) { return a.id === d.id; }))
+                                        .transition()
+                                        .duration(200);
+                                    sideinfo.html(function(a) {
+                                        var keys = d3.keys(a),
+                                            values = d3.values(a),
+                                            parentNames = getParentNames(d.id),
+                                            info;
+
+                                        info = "<p><b>" + d.properties.name + "</b><br/>";
+                                        parentNames.forEach(function(a) { info += a + ", "; });
+                                        info = info.slice(0, -2);
+                                        info += "</p><hr/><table>";
+                                        keys.forEach(function(a, i) { info += "<tr><td>" + a  + "</td><td>" + values[i] + "</td></tr>"; });
+                                        info += "</table>";
+
+                                        return info;
+                                    });
+                                })
+                                .on("mouseout", function() {
+                                    d3.select(this)
+                                        .style("fill", null)
+                                        .classed("active", false);
+                                    div.transition()
+                                        .duration(100)
+                                        .style("opacity", 0);
+                                    d3.selectAll(".sideinfo").remove();
+                                    sideinfo = d3.select("body").append("div")
+                            .attr("class", "sideinfo")
+                            .html("<p>Hover over a region</p>");
+                                });
+
+                            //add boundaries
+                            if (level === "zone" || level === "district" || level === "vdc") {
+                                //add region boundaries
+                                g.append("path")
+                                    .datum(regionBoundaries)
+                                    .attr("class", "region-boundary")
+                                    .attr("d", path);
+                            }
+
+                            if (level === "district" || level === "vdc") {
+                                //add zone boundaries
+                                g.append("path")
+                                    .datum(zoneBoundaries)
+                                    .attr("class", "zone-boundary")
+                                    .attr("d", path);
+                            }
+
+                            if (level === "vdc") {
+                                //add district boundaries
+                                g.append("path")
+                                    .datum(districtBoundaries)
+                                    .attr("class", "district-boundary")
+                                    .attr("d", path);
+                            }
+
+                            //title
+                            addTitle();
+
+                            //add legend
+                            clusterLegend(3);
+                    });
+                });
+            });
+        },
+
+        //bar charts
+        barChart: function(barData) {
+			nv.addGraph(function() {  
+				var chart = nv.models.discreteBarChart()
+					.x(function(d) { return d.label })
+					.y(function(d) { return d.value })
+					.staggerLabels(true)
+					//.staggerLabels(barData[0].values.length > 8)
+					.tooltips(false)
+					.showValues(true)
+
+				d3.select('#barChart svg')
+				    .datum(barData)
+					.transition().duration(500)
+						.call(chart);
+
+				nv.utils.windowResize(chart.update);
+
+				return chart;
+			});
+        },
+
+        //multibar Chart
+        multiBarChart: function(data) {
+			var chart;
+			nv.addGraph(function() {
+				chart = nv.models.multiBarChart()
+				  .barColor(d3.scale.category20().range());
+
+				chart.multibar
+				  .hideable(true);
+
+				chart.reduceXTicks(false).staggerLabels(true);
+
+				chart.xAxis
+					.showMaxMin(true);
+				  //  .tickFormat(d3.format(',f'));
+
+				chart.yAxis
+					.tickFormat(d3.format(',.1f'));
+
+				d3.select('#multiBarChart svg')
+					.datum(data)
+				  .transition().duration(500).call(chart);
+
+				nv.utils.windowResize(chart.update);
+
+				chart.dispatch.on('stateChange', function(e) { nv.log('New State:', JSON.stringify(e)); });
+
+				return chart;
+			});
+        },
+
+        //pie chart
+        pieChart: function(pieData) {
+			nv.addGraph(function() {
+
+				var chart = nv.models.pieChart()
+					.x(function(d) { return d.key })
+					.y(function(d) { return d.y })
+					//.showLabels(false)
+					.values(function(d) { return d })
+					.color(d3.scale.category10().range());
+
+				  d3.select("#pieChart svg")
+					  .datum([pieData])
+					.transition().duration(1200)
+					  .call(chart);
+
+				chart.dispatch.on('stateChange', function(e) { nv.log('New State:', JSON.stringify(e)); });
+
+				return chart;
+			});
+        },
+		
+		//search
+		search: function(level, names) {
+			nepal(function() {
+				var levelFeatures,
+                    ids = [];
+				switch (level) {
+
+                case "region":
+                    levelFeatures = regionFeatures;
+                    break;
+
+                case "zone":
+                    levelFeatures = zoneFeatures;
+                    break;
+
+                case "district":
+                    levelFeatures = districtFeatures;
+                    break;
+
+                case "vdc":
+                    levelFeatures = vdcFeatures;
+                    break;
+
+                /*case "ward":
+                    levelFeatures = wardFeatures;
+                    break;*/
+
+                default:
+                    console.log("Valid types: region, zone, district, vdc and ward");
+                    break;
+                }
+                   
+				levelFeatures.features.forEach(function(d) { 
+				    names.forEach(function(a) {
+						if(d.properties.name === a) {
+							ids.push(d.id);
+						}
+					});
+				});
+                d3.selectAll(".id"+ids[0]).style("fill", "red");
+			});
+		}
+    };
+}());
